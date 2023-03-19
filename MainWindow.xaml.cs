@@ -1,8 +1,11 @@
 ﻿using OpenTok;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 
 namespace CameraCapture
 {
@@ -11,22 +14,25 @@ namespace CameraCapture
     /// </summary>
     public partial class MainWindow : Window
     {
-        public const string API_KEY = "47620911";
-        public const string SESSION_ID = "1_MX40NzYyMDkxMX5-MTY3OTAzMTA3ODkwNH5lejFsNGZqbFRCMEV6TnRjMGpBYjFCdFR-fn4";
-        public const string TOKEN = "T1==cGFydG5lcl9pZD00NzYyMDkxMSZzaWc9MjllOTcxNzZlOGE2OGJhMWU0ZTFkZjI5NDI1YjQ5NTQzN2I1OTEwMDpzZXNzaW9uX2lkPTFfTVg0ME56WXlNRGt4TVg1LU1UWTNPVEF6TVRBM09Ea3dOSDVsZWpGc05HWnFiRlJDTUVWNlRuUmpNR3BCWWpGQ2RGUi1mbjQmY3JlYXRlX3RpbWU9MTY3OTAzMTA4NiZub25jZT0wLjIyNzI5NDMzNjI4NDMwMjA3JnJvbGU9cHVibGlzaGVyJmV4cGlyZV90aW1lPTE2NzkxMTc0ODYmaW5pdGlhbF9sYXlvdXRfY2xhc3NfbGlzdD0=";
+        public const string API_KEY = "";
+        public const string SESSION_ID = "";
+        public const string TOKEN = "";
 
         CameraCapturer Capturer;
         Session Session;
         Publisher Publisher;
         bool Disconnect = false;
         Dictionary<Stream, Subscriber> SubscriberByStream = new Dictionary<Stream, Subscriber>();
+        private IntPtr windowHandle;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            Capturer = new CameraCapturer(imageCap);
-            //Capturer.InitializeWebCam();
+            Capturer = new CameraCapturer();
+            Capturer.getVideoDevices((devices) => {
+                populateCameraList(devices);
+            }); // this is where you do your magic
 
             // We create the publisher here to show the preview when application starts
             // Please note that the PublisherVideo component is added in the xaml file
@@ -50,7 +56,6 @@ namespace CameraCapture
             else
             {
                 Session = new Session.Builder(Context.Instance, API_KEY, SESSION_ID).Build();
-
                 Session.Connected += Session_Connected;
                 Session.Disconnected += Session_Disconnected;
                 Session.Error += Session_Error;
@@ -176,5 +181,174 @@ namespace CameraCapture
             Disconnect = !Disconnect;
             ConnectDisconnectButton.Content = Disconnect ? "Disconnect" : "Connect";
         }
+
+        private void CameraListDropDownClosed(object sender, EventArgs e)
+        {
+            ComboBoxPairs cameraSelected = CameraList.SelectedItem as ComboBoxPairs;
+            if (cameraSelected != null)  Capturer.InitializeWebCam(cameraSelected._Value);
+        }
+
+        private void populateCameraList(Windows.Devices.Enumeration.DeviceInformationCollection devices)
+        {
+            List<ComboBoxPairs> device_list = new List<ComboBoxPairs>();
+            foreach (var device in devices)
+            {
+                device_list.Add(new ComboBoxPairs(device.Name, device.Id));
+            }
+            CameraList.DisplayMemberPath = "_Key";
+            CameraList.SelectedValuePath = "_Value";
+            CameraList.ItemsSource = device_list;
+        }
+
+        //When this window is launched, Add a Handler (HwndHandler) to our USB event watcher
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Adds the windows message processing hook and registers USB device add/removal notification.
+            HwndSource source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            if (source != null)
+            {
+                windowHandle = source.Handle;
+                source.AddHook(HwndHandler);
+                UsbNotification.RegisterUsbDeviceNotification(windowHandle);
+            }
+        }
+
+        /// <summary>
+        /// Method that receives window messages.
+        /// </summary>
+        private IntPtr HwndHandler(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam, ref bool handled)
+        {
+            if (msg == UsbNotification.WmDevicechange)
+            {
+                switch ((int)wparam)
+                {
+                    case UsbNotification.DbtDeviceremovecomplete:
+                        Capturer.getVideoDevices((devices) => {
+                            Debug.WriteLine("Device Removed");
+                            int i = 0;
+                            foreach (var device in devices)
+                            {
+                                Debug.WriteLine("* Device [{0}]", i++);
+                                /*Debug.WriteLine("EnclosureLocation.InDock: " + device.EnclosureLocation.InDock);
+                                Debug.WriteLine("EnclosureLocation.InLid: " + device.EnclosureLocation.InLid);
+                                Debug.WriteLine("EnclosureLocation.Panel: " + device.EnclosureLocation.Panel);*/
+                                Debug.WriteLine("Id: " + device.Id);
+                                Debug.WriteLine("IsDefault: " + device.IsDefault);
+                                Debug.WriteLine("IsEnabled: " + device.IsEnabled);
+                                Debug.WriteLine("Name: " + device.Name);
+                                Debug.WriteLine("IsDefault: " + device.IsDefault);
+
+                                foreach (var property in device.Properties)
+                                {
+                                    Debug.WriteLine(property.Key + ": " + property.Value);
+                                }
+                            }
+                            populateCameraList(devices);
+                        }); 
+                        break;
+                    case UsbNotification.DbtDevicearrival:
+                        Capturer.getVideoDevices((devices) => {
+                            Debug.WriteLine("Device Attached");
+                            int i = 0;
+                            foreach (var device in devices)
+                            {
+                                Debug.WriteLine("* Device [{0}]", i++);
+                                /*Debug.WriteLine("EnclosureLocation.InDock: " + device.EnclosureLocation.InDock);
+                                Debug.WriteLine("EnclosureLocation.InLid: " + device.EnclosureLocation.InLid);
+                                Debug.WriteLine("EnclosureLocation.Panel: " + device.EnclosureLocation.Panel);*/
+                                Debug.WriteLine("Id: " + device.Id);
+                                Debug.WriteLine("IsDefault: " + device.IsDefault);
+                                Debug.WriteLine("IsEnabled: " + device.IsEnabled);
+                                Debug.WriteLine("Name: " + device.Name);
+                                Debug.WriteLine("IsDefault: " + device.IsDefault);
+
+                                foreach (var property in device.Properties)
+                                {
+                                    Debug.WriteLine(property.Key + ": " + property.Value);
+                                }
+                            }
+                            populateCameraList(devices);
+                        });
+                        break;
+                }
+            }
+
+            handled = false;
+            return IntPtr.Zero;
+        }
     }
+
+    //This Class detects new hardware (USB) changes by using external DLLS
+    internal static class UsbNotification
+    {
+        public const int DbtDevicearrival = 0x8000; // system detected a new device        
+        public const int DbtDeviceremovecomplete = 0x8004; // device is gone      
+        public const int WmDevicechange = 0x0219; // device change event      
+        private const int DbtDevtypDeviceinterface = 5;
+        private static readonly Guid GuidDevinterfaceUSBDevice = new Guid("A5DCBF10-6530-11D2-901F-00C04FB951ED"); // USB devices
+        private static IntPtr notificationHandle;
+
+        /// <summary>
+        /// Registers a window to receive notifications when USB devices are plugged or unplugged.
+        /// </summary>
+        /// <param name="windowHandle">Handle to the window receiving notifications.</param>
+        public static void RegisterUsbDeviceNotification(IntPtr windowHandle)
+        {
+            DevBroadcastDeviceinterface dbi = new DevBroadcastDeviceinterface
+            {
+                DeviceType = DbtDevtypDeviceinterface,
+                Reserved = 0,
+                ClassGuid = GuidDevinterfaceUSBDevice,
+                Name = 0
+            };
+
+            dbi.Size = Marshal.SizeOf(dbi);
+            IntPtr buffer = Marshal.AllocHGlobal(dbi.Size);
+            Marshal.StructureToPtr(dbi, buffer, true);
+
+            notificationHandle = RegisterDeviceNotification(windowHandle, buffer, 0);
+        }
+
+        /// <summary>
+        /// Unregisters the window for USB device notifications
+        /// </summary>
+        public static void UnregisterUsbDeviceNotification()
+        {
+            UnregisterDeviceNotification(notificationHandle);
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr RegisterDeviceNotification(IntPtr recipient, IntPtr notificationFilter, int flags);
+
+        [DllImport("user32.dll")]
+        private static extern bool UnregisterDeviceNotification(IntPtr handle);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DevBroadcastDeviceinterface
+        {
+            internal int Size;
+            internal int DeviceType;
+            internal int Reserved;
+            internal Guid ClassGuid;
+            internal short Name;
+        }
+    }
+
+    public class ComboBoxPairs
+    {
+        public string _Key { get; set; }
+        public string _Value { get; set; }
+
+        public ComboBoxPairs(string _key, string _value)
+        {
+            _Key = _key;
+            _Value = _value;
+        }
+    }
+
+   
+
+
 }
