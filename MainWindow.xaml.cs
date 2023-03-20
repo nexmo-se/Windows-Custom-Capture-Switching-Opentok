@@ -35,11 +35,12 @@ namespace CameraCapture
 
             // We create the publisher here to show the preview when application starts
             // Please note that the PublisherVideo component is added in the xaml file
-            Publisher = new Publisher.Builder(Context.Instance)
+            Publisher = new Publisher.Builder(new Context(new WPFDispatcher()))
             {
                 Renderer = PublisherVideo,
                 Capturer = Capturer,
-                HasAudioTrack = false
+                HasAudioTrack = true
+
             }.Build();
             
             // We set the video source type to screen to disable the downscaling of the video
@@ -54,7 +55,7 @@ namespace CameraCapture
             }
             else
             {
-                Session = new Session.Builder(Context.Instance, API_KEY, SESSION_ID).Build();
+                Session = new Session.Builder(new Context(new WPFDispatcher()), API_KEY, SESSION_ID).Build();
                 Session.Connected += Session_Connected;
                 Session.Disconnected += Session_Disconnected;
                 Session.Error += Session_Error;
@@ -113,7 +114,7 @@ namespace CameraCapture
             VideoRenderer renderer = new VideoRenderer();
             SubscriberGrid.Children.Add(renderer);
             UpdateGridSize(SubscriberGrid.Children.Count);
-            Subscriber subscriber = new Subscriber.Builder(Context.Instance, e.Stream)
+            Subscriber subscriber = new Subscriber.Builder(new Context(new WPFDispatcher()), e.Stream)
             {
                 Renderer = renderer
             }.Build();
