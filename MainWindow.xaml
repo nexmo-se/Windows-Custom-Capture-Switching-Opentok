@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:CameraCapture"
         xmlns:OpenTok="clr-namespace:OpenTok;assembly=WPFVideoRenderer" x:Class="CameraCapture.MainWindow"
         mc:Ignorable="d"
-        Title="Screen Sharing" Height="350" Width="525" MinWidth="320" MinHeight="240">
+        Title="Camera Switcher" Height="350" Width="525" MinWidth="320" MinHeight="240">
     <Grid>
         <UniformGrid x:Name="SubscriberGrid" Rows="1" Columns="0" Margin="0,0,215,5">
         </UniformGrid>

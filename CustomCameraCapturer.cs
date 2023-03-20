@@ -1,7 +1,4 @@
 ﻿using OpenTok;
-using SharpDX;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
 using System;
 using System.Diagnostics;
 using System.Drawing.Imaging;
@@ -10,20 +7,18 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using Windows.Devices.Enumeration;
 using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
-using BitmapDecoder = Windows.Graphics.Imaging.BitmapDecoder;
 using BitmapEncoder = Windows.Graphics.Imaging.BitmapEncoder;
 using System.Windows;
 using System.Threading.Tasks;
 
 namespace CameraCapture
 {
-    public class CameraCapturer : IVideoCapturer
+    public class CustomCameraCapturer : IVideoCapturer
     {
         int width;
         int height;

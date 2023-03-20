@@ -1,7 +1,6 @@
 ﻿using OpenTok;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -18,7 +17,7 @@ namespace CameraCapture
         public const string SESSION_ID = "";
         public const string TOKEN = "";
 
-        CameraCapturer Capturer;
+        CustomCameraCapturer Capturer;
         Session Session;
         Publisher Publisher;
         bool Disconnect = false;
@@ -29,7 +28,7 @@ namespace CameraCapture
         {
             InitializeComponent();
 
-            Capturer = new CameraCapturer();
+            Capturer = new CustomCameraCapturer();
             Capturer.getVideoDevices((devices) => {
                 populateCameraList(devices);
             }); // this is where you do your magic
@@ -198,6 +197,7 @@ namespace CameraCapture
             CameraList.DisplayMemberPath = "_Key";
             CameraList.SelectedValuePath = "_Value";
             CameraList.ItemsSource = device_list;
+            CameraList.Text = (devices[0].Name);
         }
 
         //When this window is launched, Add a Handler (HwndHandler) to our USB event watcher
@@ -227,48 +227,12 @@ namespace CameraCapture
                     case UsbNotification.DbtDeviceremovecomplete:
                         Capturer.getVideoDevices((devices) => {
                             Debug.WriteLine("Device Removed");
-                            int i = 0;
-                            foreach (var device in devices)
-                            {
-                                Debug.WriteLine("* Device [{0}]", i++);
-                                /*Debug.WriteLine("EnclosureLocation.InDock: " + device.EnclosureLocation.InDock);
-                                Debug.WriteLine("EnclosureLocation.InLid: " + device.EnclosureLocation.InLid);
-                                Debug.WriteLine("EnclosureLocation.Panel: " + device.EnclosureLocation.Panel);*/
-                                Debug.WriteLine("Id: " + device.Id);
-                                Debug.WriteLine("IsDefault: " + device.IsDefault);
-                                Debug.WriteLine("IsEnabled: " + device.IsEnabled);
-                                Debug.WriteLine("Name: " + device.Name);
-                                Debug.WriteLine("IsDefault: " + device.IsDefault);
-
-                                foreach (var property in device.Properties)
-                                {
-                                    Debug.WriteLine(property.Key + ": " + property.Value);
-                                }
-                            }
                             populateCameraList(devices);
                         }); 
                         break;
                     case UsbNotification.DbtDevicearrival:
                         Capturer.getVideoDevices((devices) => {
                             Debug.WriteLine("Device Attached");
-                            int i = 0;
-                            foreach (var device in devices)
-                            {
-                                Debug.WriteLine("* Device [{0}]", i++);
-                                /*Debug.WriteLine("EnclosureLocation.InDock: " + device.EnclosureLocation.InDock);
-                                Debug.WriteLine("EnclosureLocation.InLid: " + device.EnclosureLocation.InLid);
-                                Debug.WriteLine("EnclosureLocation.Panel: " + device.EnclosureLocation.Panel);*/
-                                Debug.WriteLine("Id: " + device.Id);
-                                Debug.WriteLine("IsDefault: " + device.IsDefault);
-                                Debug.WriteLine("IsEnabled: " + device.IsEnabled);
-                                Debug.WriteLine("Name: " + device.Name);
-                                Debug.WriteLine("IsDefault: " + device.IsDefault);
-
-                                foreach (var property in device.Properties)
-                                {
-                                    Debug.WriteLine(property.Key + ": " + property.Value);
-                                }
-                            }
                             populateCameraList(devices);
                         });
                         break;
