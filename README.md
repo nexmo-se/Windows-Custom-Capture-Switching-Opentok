@@ -1,23 +1,37 @@
-ScreenSharing
+Custom Camera Capture with Seamless Switching
 =============
 
 This project shows how to use OpenTok Windows SDK to publish a stream that uses
-the content of the screen as the video source for an OpenTok publisher.
+USB Cameras of the screen as the video source for an OpenTok publisher.
 
-*Important:* To use this application, follow the instructions in the
-[Quick Start](../README.md#quick-start) section of the main README file
-for this repository.
+## Quick Start
 
-Application Notes
------------------
-  * This application uses Microsoft DirectX graphics APIs, which are not supported on
-    Windows 7. This sample code works on Windows 8+.
+1. Get values for your OpenTok **API key**, **session ID**, and **token**.
 
-ScreenSharingCapturer.cs
+   You can obtain these values from your [TokBox account](#https://tokbox.com/account/#/).
+   Make sure that the token isn't expired.
+
+   For testing, you can use a session ID and token generated at your TokBox account page.
+   However, the final application should obtain these values using the [OpenTok server
+   SDKs](https://tokbox.com/developer/sdks/server/). For more information, see the OpenTok
+   developer guides on [session creation](https://tokbox.com/developer/guides/create-session/)
+   and [token creation](https://tokbox.com/developer/guides/create-token/).
+
+2. In Visual Studio, open the .sln solution file for the sample app you are using
+   (CustomVideoRenderer/CustomVideoRenderer.sln, ScreenSharing/ScreenSharing.sln,
+   or SimpleMultiparty/SimpleMultiparty.sln).
+
+3. Open the MainWindow.xaml.cs file for the app and edit the values for `API_KEY`, `SESSION_ID`,
+   and `TOKEN` to match API key, session ID, and token data you obtained in step 1.
+
+NuGet automatically installs the OpenTok SDK when you build the project.
+
+
+CustomCameraCatpturer.cs
 ------------------------
 
 This is the core class of the sample application. It captures the contents of the
-screen and uses the frames as the video source for an OpenTok Publisher object.
+USB Camera and uses the frames as the video source for an OpenTok Publisher object.
 
 To be able to provide frames to the OpenTok SDK you need to implement the
 `IVideoCapturer` interface. This is also known as building your own video Capturer.
@@ -60,12 +74,25 @@ using (var frame = VideoFrame.CreateYuv420pFrameFromBuffer(PixelFormat.FormatArg
 }
 ```
 
-#### Capturing the screen
+#### Capturing the Camera
 
-This sample uses SharpDX (a DirectX C# wrapper) to capture the screen contents. To create
-the video, the app uses a timer, which is called 15 times a second. In each tick, the timer
-captures the screen and provides the frame to custom video capturer by calling
-`frameConsumer.Consume(frame)`.
+This sample UWP Media Capture class to capture the screen contents. To create
+the video, the app Initializes the camera using MediaCapture class. It then uses MediaFrameReader to
+get the frames from Media capture and pass the bmp frame to `frameConsumer.Consume(frame)`.
+
+### Detecting Hardware Changes
+
+Inside `MainWindow.xaml.cs`, we use the `UsbNotification` function to include two external functions from `user32.dll`.
+These functions are `RegisterDeviceNotification` and `UnregisterDeviceNotification`. 
+These functions requires a callback parameter that handles the Hardware changes.
+
+Once we detect USB hardware change, we call `CustomCameraCapturer().getVideoDevices()` to query for vide capture devices
+and populate out list of cameras.
+
+#### Switching between Cameras
+
+To Switch cameras, simply get the camera's deviceID and pass it to `CustomCameraCapturer().InitializeWebCam(deviceID)`
+We get the camera's deviceID from the data in our camera list.
 
 MainWindow.xaml.cs
 ------------------
@@ -73,7 +100,7 @@ MainWindow.xaml.cs
 To use the capturer, pass it in as the `capturer` parameter of the `Publisher()` constructor:
 
 ```csharp
-Capturer = new ScreenSharingCapturer();
+Capturer = new CustomCameraCatpturer();
 
 Publisher = new Publisher(Context.Instance, 
   renderer: PublisherVideo,
