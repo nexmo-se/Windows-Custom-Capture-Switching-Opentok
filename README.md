@@ -27,7 +27,7 @@ USB Cameras of the screen as the video source for an OpenTok publisher.
 NuGet automatically installs the OpenTok SDK when you build the project.
 
 
-CustomCameraCatpturer.cs
+CustomCameraCapturer.cs
 ------------------------
 
 This is the core class of the sample application. It captures the contents of the
@@ -100,7 +100,7 @@ MainWindow.xaml.cs
 To use the capturer, pass it in as the `capturer` parameter of the `Publisher()` constructor:
 
 ```csharp
-Capturer = new CustomCameraCatpturer();
+Capturer = new CustomCameraCapturer();
 
 Publisher = new Publisher(Context.Instance, 
   renderer: PublisherVideo,
