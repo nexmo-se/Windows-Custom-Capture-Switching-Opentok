@@ -26,8 +26,10 @@ namespace CameraCapture
         Timer timer;
         IVideoFrameConsumer frameConsumer;
         MediaCapture mediaCapture;
+        MediaCapture mediaCapture_buff;
         DeviceInformationCollection devices;
         MediaFrameReader mediaFrameReader;
+        MediaFrameReader mediaFrameReader_buff;
         private SoftwareBitmap backBuffer;
         public void Init(IVideoFrameConsumer _frameConsumer)
         {
@@ -67,6 +69,7 @@ namespace CameraCapture
 
         public async void InitializeWebCam(string device_id)
         {
+            Debug.WriteLine(">>INIT WE CAM");
             //if null is passed, use the defaule camera
             if (device_id is null)
             {
@@ -81,11 +84,16 @@ namespace CameraCapture
             }
             if (mediaFrameReader != null)
             {
-                await mediaFrameReader.StopAsync();
+                mediaFrameReader_buff = mediaFrameReader;
+                mediaFrameReader = null;
+                mediaFrameReader_buff.FrameArrived -= ColorFrameReader_FrameArrived_normal;
+                mediaFrameReader_buff.FrameArrived += ColorFrameReader_FrameArrived_overflow;
+                //await mediaFrameReader.StopAsync();
             }
 
             try
             {
+                mediaCapture_buff = mediaCapture;
                 mediaCapture = new MediaCapture();
                 await mediaCapture.InitializeAsync(
                     new MediaCaptureInitializationSettings
@@ -116,13 +124,15 @@ namespace CameraCapture
 
 
             mediaFrameReader = await mediaCapture.CreateFrameReaderAsync(colorFrameSource, MediaEncodingSubtypes.Argb32);
-            mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived;
+            mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived_normal;
+            
             await mediaFrameReader.StartAsync();
   
         }
 
-        private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args, Boolean overflow)
         {
+            
             var mediaFrameReference = sender.TryAcquireLatestFrame();
             var videoMediaFrame = mediaFrameReference?.VideoMediaFrame;
             var softwareBitmap = videoMediaFrame?.SoftwareBitmap;
@@ -130,6 +140,27 @@ namespace CameraCapture
 
             if (softwareBitmap != null)
             {
+                if (!overflow)
+                {
+                    Debug.WriteLine(">>FRAME ");
+                    if (mediaFrameReader_buff != null)
+                    {
+                        mediaCapture_buff = null;
+                        await mediaFrameReader_buff.StopAsync();
+                        mediaFrameReader_buff = null;
+                        return;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine(">>FRAME OVERFLOW");
+                    if (sender == null)
+                    {
+                        return;
+                    }
+                }
+
+                
                 if (softwareBitmap.BitmapPixelFormat != Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8 ||
                     softwareBitmap.BitmapAlphaMode != Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied)
                 {
@@ -142,6 +173,7 @@ namespace CameraCapture
                 SoftwareBitmap latestBitmap;
                 while ((latestBitmap = Interlocked.Exchange(ref backBuffer, null)) != null)
                 {
+
                     using (var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream())
                     {
                         BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
@@ -156,9 +188,23 @@ namespace CameraCapture
                     latestBitmap.Dispose();
 
                 }
-               
+
+            }
+            else
+            {
+                Debug.WriteLine(">>NOFRAME");
             }
 
+        }
+
+        private void ColorFrameReader_FrameArrived_normal(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        {
+            ColorFrameReader_FrameArrived(sender, args, false);
+        }
+        
+        private  void ColorFrameReader_FrameArrived_overflow(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        {
+            ColorFrameReader_FrameArrived( sender,  args, true);
         }
 
 
