@@ -84,6 +84,7 @@ namespace CameraCapture
             }
             if (mediaFrameReader != null)
             {
+                if (mediaFrameReader_buff != null) await mediaFrameReader_buff.StopAsync();
                 mediaFrameReader_buff = mediaFrameReader;
                 mediaFrameReader = null;
                 mediaFrameReader_buff.FrameArrived -= ColorFrameReader_FrameArrived_normal;
@@ -213,7 +214,7 @@ namespace CameraCapture
             InitializeWebCam(null); //starts with default camera
         }
 
-        public void Stop()
+        public async void Stop()
         {
             if (timer != null)
             {
@@ -224,6 +225,15 @@ namespace CameraCapture
                 }
             }
             timer = null;
+
+            if (mediaFrameReader != null)
+            {               
+                await mediaFrameReader.StopAsync();
+            }
+            if (mediaFrameReader_buff != null)
+            {
+                await mediaFrameReader_buff.StopAsync();
+            }
         }
 
         public void Destroy()
