@@ -22,10 +22,10 @@ namespace CameraCapture
     {
         int width;
         int height;
+        bool blackout = false;
         const int FPS = 15;
         Timer timer;
         IVideoFrameConsumer frameConsumer;
-        IVideoFrameConsumer fauxConsumer;
         MediaCapture mediaCapture;
         MediaCapture mediaCapture_buff;
         DeviceInformationCollection devices;
@@ -37,24 +37,6 @@ namespace CameraCapture
         public void Init(IVideoFrameConsumer _frameConsumer)
         {
             frameConsumer = _frameConsumer;
-        }
-
-        private static BitmapImage ToBitmapImage(Bitmap bitmap)
-        {
-            using (var memory = new MemoryStream())
-            {
-                bitmap.Save(memory, ImageFormat.Png);
-                memory.Position = 0;
-
-                var bitmapImage = new BitmapImage();
-                bitmapImage.BeginInit();
-                bitmapImage.StreamSource = memory;
-                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                bitmapImage.EndInit();
-                bitmapImage.Freeze();
-
-                return bitmapImage;
-            }
         }
 
         public async void getVideoDevices( Action<DeviceInformationCollection> callback )
@@ -76,7 +58,7 @@ namespace CameraCapture
             //if null is passed, use the defaule camera
             
             fade_out = 0;
-            fade_in =255;
+            
             if (device_id is null)
             {
                 devices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
@@ -88,22 +70,11 @@ namespace CameraCapture
                 }
                 device_id = devices[0].Id;
             }
-            if (mediaFrameReader != null)
-            {
-                
-                mediaFrameReader_buff = mediaFrameReader;
-                
-                
-                mediaFrameReader_buff.FrameArrived += ColorFrameReader_FrameArrived_overflow;
-                mediaFrameReader_buff.FrameArrived -= ColorFrameReader_FrameArrived_normal;
-                //await mediaFrameReader.StopAsync();
-            }
 
             try
             {
-                mediaCapture_buff = mediaCapture;
-                mediaCapture = new MediaCapture();
-                await mediaCapture.InitializeAsync(
+                mediaCapture_buff = new MediaCapture(); //instantiate a mediaCapture_buffer
+                await mediaCapture_buff.InitializeAsync(
                     new MediaCaptureInitializationSettings
                     {
                         VideoDeviceId = device_id,
@@ -119,10 +90,8 @@ namespace CameraCapture
                 return;
             }
 
-            
-            Debug.WriteLine(">>KEY",mediaCapture.FrameSources.FirstOrDefault().Key);
-            var colorFrameSource = mediaCapture.FrameSources.FirstOrDefault().Value;
-            Debug.WriteLine("Frame Sources", mediaCapture.FrameSources);
+            var colorFrameSource = mediaCapture_buff.FrameSources.FirstOrDefault().Value;
+            Debug.WriteLine("Frame Sources", mediaCapture_buff.FrameSources);
             var preferredFormat = colorFrameSource.SupportedFormats.Where(format =>
             {
                 return format.VideoFormat.Width >= 1080
@@ -130,17 +99,33 @@ namespace CameraCapture
 
             }).FirstOrDefault();
             
-            mediaFrameReader = await mediaCapture.CreateFrameReaderAsync(colorFrameSource, MediaEncodingSubtypes.Argb32);
+            //here we let the mediaCapture Buffer do the initialization. The main mediaCapture is untouched until we switch
+            //Also we assign it to a mediaFrameReader buffer so the main one is also untouched while this one loads
+            mediaFrameReader_buff = await mediaCapture_buff.CreateFrameReaderAsync(colorFrameSource, MediaEncodingSubtypes.Argb32);
+            await mediaFrameReader_buff.StartAsync(); //start capture on new device using the mediaFrameReader Buffer
+            mediaCapture = mediaCapture_buff; //we assign the buffer to the mediaCapture
+            mediaCapture_buff = null; //we dispose the mediaCaptureBuffer
+            
+            fade_in = 255; //start the fade
+
+            //if there is a current Frame reader, let's dispose it
             if (mediaFrameReader != null)
-                await mediaFrameReader.StopAsync();
-            mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived_normal;
-            await mediaFrameReader.StartAsync();
-  
+            {
+                
+                mediaFrameReader.Dispose();
+                mediaFrameReader = null;
+            }
+            
+            //we assign the mediFrameReader buffer to the main mediaFrame Reader
+            mediaFrameReader = mediaFrameReader_buff;
+            mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived; //assign a callback handler
+            mediaFrameReader_buff = null; //dispose the buffer
         }
 
-        private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args, Boolean overflow)
+       
+
+        private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
         {
-            
             var mediaFrameReference = sender.TryAcquireLatestFrame();
             var videoMediaFrame = mediaFrameReference?.VideoMediaFrame;
             var softwareBitmap = videoMediaFrame?.SoftwareBitmap;
@@ -148,30 +133,6 @@ namespace CameraCapture
 
             if (softwareBitmap != null)
             {
-                if (!overflow)
-                {
-                    Debug.WriteLine(">>FRAME ");
-                    if (mediaFrameReader_buff != null)
-                    {
-                        mediaCapture_buff = null;
-                        
-                        mediaFrameReader_buff.FrameArrived -= ColorFrameReader_FrameArrived_overflow;
-                        await mediaFrameReader_buff.StopAsync();
-                        mediaFrameReader_buff = null;
- 
-                        return;
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine(">>FRAME OVERFLOW");
-                    if (sender == null)
-                    {
-                        return;
-                    }
-                }
-
-                
                 if (softwareBitmap.BitmapPixelFormat != Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8 ||
                     softwareBitmap.BitmapAlphaMode != Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied)
                 {
@@ -191,45 +152,24 @@ namespace CameraCapture
                         encoder.SetSoftwareBitmap(latestBitmap);
                         await encoder.FlushAsync();
                         Bitmap bmp = new Bitmap(stream.AsStream());
-                        
-                        if (fade_in >= 0 && !overflow)
-                        {
 
-                            
+                        if (fade_in >= 0)
+                        {
                             Debug.WriteLine(fade_in);
                             Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
                             using (Graphics g = Graphics.FromImage(bmp))
                             {
-                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(fade_in > 255?255:fade_in, Color.Black)))
+                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(fade_in, Color.Black)))
                                 {
                                     g.FillRectangle(cloud_brush, r);
                                 }
                             }
-                            fade_in -= 50;
+                            fade_in -= 70;
                         }
-                        else if(overflow )
-                        {
-                            if (fade_out >= 255)
-                            {
-                                return;
 
-                            }
-                            Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
-                            using (Graphics g = Graphics.FromImage(bmp))
-                            {
-                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(fade_out, Color.Black)))
-                                {
-                                    g.FillRectangle(cloud_brush, r);
-                                }
-                            }
-                            fade_out += 50;
-                           
-
-                        }
-                        if (AllOneColor(bmp)) return;
+      
                         using (var frame = VideoFrame.CreateYuv420pFrameFromBitmap(bmp))
                         {
-                            Debug.WriteLine("Wrote Something");
                             this.frameConsumer.Consume(frame);
                         }
                     }
@@ -245,49 +185,8 @@ namespace CameraCapture
 
         }
 
-        private void ColorFrameReader_FrameArrived_normal(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
-        {
-            ColorFrameReader_FrameArrived(sender, args, false);
-        }
-        
-        private  void ColorFrameReader_FrameArrived_overflow(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
-        {
-            ColorFrameReader_FrameArrived( sender,  args, true);
-        }
 
-        private bool AllOneColor(Bitmap bmp)
-        {
-            // Lock the bitmap's bits.  
-            Rectangle rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
-            BitmapData bmpData = bmp.LockBits(rect, ImageLockMode.ReadWrite, bmp.PixelFormat);
-
-            // Get the address of the first line.
-            IntPtr ptr = bmpData.Scan0;
-
-            // Declare an array to hold the bytes of the bitmap.
-            int bytes = bmpData.Stride * bmp.Height;
-            byte[] rgbValues = new byte[bytes];
-
-            // Copy the RGB values into the array.
-
-            System.Runtime.InteropServices.Marshal.Copy(ptr, rgbValues, 0, bytes);
-
-            bool AllOneColor = true;
-            for (int index = 0; index < rgbValues.Length; index++)
-            {
-                //compare the current A or R or G or B with the A or R or G or B at position 0,0.
-                if (rgbValues[index] != rgbValues[index % 4])
-                {
-                    AllOneColor = false;
-                    break;
-                }
-            }
-            // Unlock the bits.
-            bmp.UnlockBits(bmpData);
-            return AllOneColor;
-        }
-
-
+      
         public void Start()
         {
             InitializeWebCam(null); //starts with default camera
