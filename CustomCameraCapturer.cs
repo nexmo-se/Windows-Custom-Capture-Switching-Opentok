@@ -15,6 +15,7 @@ using Windows.Media.MediaProperties;
 using BitmapEncoder = Windows.Graphics.Imaging.BitmapEncoder;
 using System.Windows;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.VoiceCommands;
 
 namespace CameraCapture
 {
@@ -25,6 +26,7 @@ namespace CameraCapture
         bool blackout = false;
         const int FPS = 15;
         Timer timer;
+        public bool camera_on = false;
         IVideoFrameConsumer frameConsumer;
         MediaCapture mediaCapture;
         MediaCapture mediaCapture_buff;
@@ -56,10 +58,10 @@ namespace CameraCapture
         {
             Debug.WriteLine(">>INIT WEB CAM");
             //if null is passed, use the defaule camera
-            
+            this.camera_on = true;
             fade_out = 0;
-            blackout = false;
-            
+            blackout = true;
+
             if (device_id is null)
             {
                 devices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
@@ -99,18 +101,19 @@ namespace CameraCapture
                 && format.Subtype == MediaEncodingSubtypes.Argb32;
 
             }).FirstOrDefault();
-            
+
             //here we let the mediaCapture Buffer do the initialization. The main mediaCapture is untouched until we switch
             //Also we assign it to a mediaFrameReader buffer so the main one is also untouched while this one loads
             mediaFrameReader_buff = await mediaCapture_buff.CreateFrameReaderAsync(colorFrameSource, MediaEncodingSubtypes.Argb32);
             await mediaFrameReader_buff.StartAsync(); //start capture on new device using the mediaFrameReader Buffer
             mediaCapture = mediaCapture_buff; //we assign the buffer to the mediaCapture
+            
             mediaCapture.Failed += CameraFailed;
-            mediaCapture.CameraStreamStateChanged += CameraStateChanged;
+            mediaCapture.CameraStreamStateChanged += CameraStateChanged;            
             mediaCapture_buff = null; //we dispose the mediaCaptureBuffer
             
-            fade_in = 255; //start the fade
-
+            
+            
             //if there is a current Frame reader, let's dispose it
             if (mediaFrameReader != null)
             {
@@ -123,7 +126,9 @@ namespace CameraCapture
             mediaFrameReader = mediaFrameReader_buff;
             mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived; //assign a callback handler
             mediaFrameReader_buff = null; //dispose the buffer
-            
+            await Task.Delay(250);
+            blackout = false;
+            fade_in = 255; //start the fade
         }
 
         private void CameraStateChanged(MediaCapture sender, object args)
@@ -135,10 +140,47 @@ namespace CameraCapture
         private void CameraFailed(MediaCapture sender, MediaCaptureFailedEventArgs errorEventArgs)
         {
             this.blackout = true; //set screen to black;
+            this.camera_on = false;
+        }
+
+        public void stopCameras()
+        {
+            if (mediaFrameReader != null)
+            {
+                mediaFrameReader.FrameArrived -= ColorFrameReader_FrameArrived;
+                mediaFrameReader.Dispose();
+                mediaFrameReader = null;
+            }
+            if (mediaCapture != null)
+            {
+                mediaCapture.Dispose();
+                mediaCapture = null;
+
+            }
+            this.blackout = true; //set screen to black;
+            this.camera_on = false;
+
+            Bitmap bmp = new Bitmap(1, 1);
+            Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(255, Color.Black)))
+                {
+                    g.FillRectangle(cloud_brush, r);
+                }
+
+            }
+            using (var frame = VideoFrame.CreateYuv420pFrameFromBitmap(bmp))
+            {
+                this.frameConsumer.Consume(frame);
+            }
+
         }
 
         private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
         {
+            Debug.WriteLine("FrameArrived");
+            Debug.WriteLine(mediaFrameReader == null); ;
             SoftwareBitmap softwareBitmap = null;
             try { 
                 var mediaFrameReference = sender.TryAcquireLatestFrame();

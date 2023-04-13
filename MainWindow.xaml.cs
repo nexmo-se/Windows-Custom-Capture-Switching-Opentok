@@ -243,6 +243,20 @@ namespace CameraCapture
             handled = false;
             return IntPtr.Zero;
         }
+
+        private void Start_Camera_Click(object sender, RoutedEventArgs e)
+        {
+            if (!Capturer.camera_on) //only init if not running
+            {
+                ComboBoxPairs cameraSelected = CameraList.SelectedItem as ComboBoxPairs;
+                Capturer.InitializeWebCam(cameraSelected._Value); 
+            }
+        }
+
+        private void Stop_Camera_Click(object sender, RoutedEventArgs e)
+        {
+            if (Capturer.camera_on) Capturer.stopCameras(); //only stop if running
+        }
     }
 
     //This Class detects new hardware (USB) changes by using external DLLS

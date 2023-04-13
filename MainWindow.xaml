@@ -8,11 +8,19 @@
         mc:Ignorable="d"
         Title="Camera Switcher" Height="480" Width="640" MinWidth="320" MinHeight="240">
     <Grid>
-        <UniformGrid x:Name="SubscriberGrid" Rows="1" Columns="0" Margin="10,137,0,5" HorizontalAlignment="Left" Width="418">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="93*"/>
+            <ColumnDefinition Width="227*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="0*"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <UniformGrid x:Name="SubscriberGrid" Rows="1" Columns="0" Margin="10,137,0,5" HorizontalAlignment="Left" Width="418" Grid.Row="1" Grid.ColumnSpan="2">
         </UniformGrid>
-        <ComboBox Name="CameraList" Width="170" Height="23" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,44,0,0" DropDownClosed="CameraListDropDownClosed">
+        <ComboBox Name="CameraList" Width="170" Height="23" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,44,0,0" DropDownClosed="CameraListDropDownClosed" Grid.Row="1">
         </ComboBox>
-        <OpenTok:VideoRenderer x:Name="PublisherVideo" HorizontalAlignment="Right" Height="114" VerticalAlignment="Bottom" Width="184" Margin="0,0,10,340" BorderBrush="#FF5B1919" BorderThickness="1" RenderTransformOrigin="0.511,0.474" >
+        <OpenTok:VideoRenderer x:Name="PublisherVideo" HorizontalAlignment="Right" Height="114" VerticalAlignment="Bottom" Width="184" Margin="0,0,10,340" BorderBrush="#FF5B1919" BorderThickness="1" RenderTransformOrigin="0.511,0.474" Grid.Row="1" Grid.Column="1" >
             <OpenTok:VideoRenderer.Effect>
                 <DropShadowEffect Opacity="0.6"/>
             </OpenTok:VideoRenderer.Effect>
@@ -21,9 +29,12 @@
                 </ImageBrush>
             </OpenTok:VideoRenderer.Background>
         </OpenTok:VideoRenderer>
-        <Grid HorizontalAlignment="Right" Height="24" VerticalAlignment="Bottom" Width="80" Margin="0,0,10,5">
+        <Grid HorizontalAlignment="Right" Height="24" VerticalAlignment="Bottom" Width="80" Margin="0,0,10,5" Grid.Row="1" Grid.Column="1">
             <Button x:Name="ConnectDisconnectButton" Content="Connect" HorizontalAlignment="Left" Margin="-13,-306,0,306" Width="80" Click="Connect_Click"/>
+            <Button x:Name="Start_Camera" Content="Start Camera" HorizontalAlignment="Left" Margin="-13,-250,0,250" Width="80" Click="Start_Camera_Click"/>
+            <Button x:Name="Stop_Camera" Content="Stop Camera"  HorizontalAlignment="Left" Margin="-13,-220,0,220" Width="80" Click="Stop_Camera_Click"/>
         </Grid>
-        <Label Content="Video Capture Source" HorizontalAlignment="Left" Margin="10,18,0,0" VerticalAlignment="Top"/>
+        <Label Content="Video Capture Source" HorizontalAlignment="Left" Margin="10,18,0,0" VerticalAlignment="Top" Grid.Row="1"/>
+        
     </Grid>
 </Window>
