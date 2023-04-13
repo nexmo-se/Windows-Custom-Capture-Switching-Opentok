@@ -54,10 +54,11 @@ namespace CameraCapture
 
         public async void InitializeWebCam(string device_id)
         {
-            Debug.WriteLine(">>INIT WE CAM");
+            Debug.WriteLine(">>INIT WEB CAM");
             //if null is passed, use the defaule camera
             
             fade_out = 0;
+            blackout = false;
             
             if (device_id is null)
             {
@@ -104,6 +105,8 @@ namespace CameraCapture
             mediaFrameReader_buff = await mediaCapture_buff.CreateFrameReaderAsync(colorFrameSource, MediaEncodingSubtypes.Argb32);
             await mediaFrameReader_buff.StartAsync(); //start capture on new device using the mediaFrameReader Buffer
             mediaCapture = mediaCapture_buff; //we assign the buffer to the mediaCapture
+            mediaCapture.Failed += CameraFailed;
+            mediaCapture.CameraStreamStateChanged += CameraStateChanged;
             mediaCapture_buff = null; //we dispose the mediaCaptureBuffer
             
             fade_in = 255; //start the fade
@@ -111,7 +114,7 @@ namespace CameraCapture
             //if there is a current Frame reader, let's dispose it
             if (mediaFrameReader != null)
             {
-                
+                mediaFrameReader.FrameArrived -= ColorFrameReader_FrameArrived;
                 mediaFrameReader.Dispose();
                 mediaFrameReader = null;
             }
@@ -120,16 +123,33 @@ namespace CameraCapture
             mediaFrameReader = mediaFrameReader_buff;
             mediaFrameReader.FrameArrived += ColorFrameReader_FrameArrived; //assign a callback handler
             mediaFrameReader_buff = null; //dispose the buffer
+            
         }
 
-       
+        private void CameraStateChanged(MediaCapture sender, object args)
+        {
+            Debug.WriteLine(">>Cam State Changed");
+            Debug.WriteLine(sender.CameraStreamState.ToString());
+        }
+
+        private void CameraFailed(MediaCapture sender, MediaCaptureFailedEventArgs errorEventArgs)
+        {
+            this.blackout = true; //set screen to black;
+        }
 
         private async void ColorFrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
         {
-            var mediaFrameReference = sender.TryAcquireLatestFrame();
-            var videoMediaFrame = mediaFrameReference?.VideoMediaFrame;
-            var softwareBitmap = videoMediaFrame?.SoftwareBitmap;
+            SoftwareBitmap softwareBitmap = null;
+            try { 
+                var mediaFrameReference = sender.TryAcquireLatestFrame();
+                var videoMediaFrame = mediaFrameReference?.VideoMediaFrame;
+                softwareBitmap = videoMediaFrame?.SoftwareBitmap;
 
+            }
+            catch {
+                return; //do nothing if object is closed
+            }
+           
 
             if (softwareBitmap != null)
             {
@@ -152,8 +172,20 @@ namespace CameraCapture
                         encoder.SetSoftwareBitmap(latestBitmap);
                         await encoder.FlushAsync();
                         Bitmap bmp = new Bitmap(stream.AsStream());
+                        if (blackout)
+                        {
+                            Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
+                            using (Graphics g = Graphics.FromImage(bmp))
+                            {
+                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(255, Color.Black)))
+                                {
+                                    g.FillRectangle(cloud_brush, r);
+                                }
 
-                        if (fade_in >= 0)
+                            }
+
+                        }
+                        else if (!blackout && fade_in >= 0)
                         {
                             Debug.WriteLine(fade_in);
                             Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
@@ -166,8 +198,8 @@ namespace CameraCapture
                             }
                             fade_in -= 70;
                         }
-
-      
+                        //if it's blackout, write black frame
+                        
                         using (var frame = VideoFrame.CreateYuv420pFrameFromBitmap(bmp))
                         {
                             this.frameConsumer.Consume(frame);
