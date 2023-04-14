@@ -233,7 +233,7 @@ namespace CameraCapture
                             Rectangle r = new Rectangle(0, 0, bmp.Width, bmp.Height);
                             using (Graphics g = Graphics.FromImage(bmp))
                             {
-                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(fade_in, Color.Black)))
+                                using (Brush cloud_brush = new SolidBrush(Color.FromArgb(fade_in<0?0:fade_in, Color.Black)))
                                 {
                                     g.FillRectangle(cloud_brush, r);
                                 }
